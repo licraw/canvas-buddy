@@ -28,85 +28,140 @@ const UploadWrapper = styled.div`
   border-radius: 5px;
   padding: 50px;
   text-align: center;
+  margin-bottom: 32px;
+  width: 350px;
 `;
 
-const FileUploader: React.FC<FileUploaderProps> = ({ onFileAdded }) => {
-  const [htmlContent, setHtmlContent] = useState("");
+const ButtonWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 32px;
+`;
+
+const FileWrapper = styled.div`
+  border: solid black 1px;
+  padding: 16px;
+  margin: 16px 0;
+`;
+
+const FileUploader: React.FC = () => {
+  const [htmlContent, setHtmlContent] = useState<string[]>([]);
+  const [innerHTML, setInnerHTML] = useState<string | null>(null);
   const [sendData, setSendData] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileList, setFileList] = useState<File[]>([]);
 
-  const handleFileAdded = async (files: File[]) => {
-    let htmlContent = "";
-    for (const file of files) {
-      if (file.type !== "text/html") {
-        alert("Invalid file type. Please select an HTML file.");
-        return;
-      }
-
-      // Check file size
-      const maxFileSize = 1e6; // 1 MB
-      if (file.size > maxFileSize) {
-        alert(
-          `File size too large. Please select a file less than ${
-            maxFileSize / 1e6
-          } MB.`
-        );
-        return;
-      }
-
-      /// Read file content
+  useEffect(() => {
+    if (selectedFile) {
+      setFileList([...fileList, selectedFile]);
       const reader = new FileReader();
       reader.onload = (e: any) => {
-        htmlContent += e.target.result;
+        setHtmlContent([...htmlContent, e.target.result]);
       };
-      reader.readAsText(file);
+      reader.readAsText(selectedFile);
     }
-    console.log(files);
-    setHtmlContent(htmlContent);
-    console.log(htmlContent);
-  };
+  }, [selectedFile]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    handleFileAdded(acceptedFiles);
+    if (acceptedFiles.length === 0) {
+      return;
+    }
+
+    const file = acceptedFiles[0];
+    if (file.type !== "text/html") {
+      alert("Invalid file type. Please select an HTML file.");
+      return;
+    }
+
+    // Check file size
+    const maxFileSize = 1e6; // 1 MB
+    if (file.size > maxFileSize) {
+      alert(
+        `File size too large. Please select a file less than ${
+          maxFileSize / 1e6
+        } MB.`
+      );
+      return;
+    }
+
+    setSelectedFile(file);
   }, []);
 
   useEffect(() => {
-    if (sendData) {
+    if (sendData === true) {
+      const htmlContentBlob = new Blob([extractMainContents(htmlContent)], {
+        type: "text/html",
+      });
+      const formData = new FormData();
+      formData.append("file", htmlContentBlob);
       fetch("http://localhost:3001", {
         method: "POST",
-        body: JSON.stringify({ html: htmlContent }),
-        headers: {
-          "Content-Type": "application/json",
-        },
+        body: formData,
       })
         .then((response) => response.text())
         .then((data) => {
-          console.log(data);
+          setInnerHTML(data);
+          console.log("innerHTML: ", innerHTML);
         })
         .catch((error) => {
           console.error(error);
         });
     }
-  }, [sendData, htmlContent]);
+  }, [htmlContent, sendData]);
+
+  const extractMainContents = (htmlArray: string[]) => {
+    const mainContents = htmlArray.map((html, index) => {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, "text/html");
+      const mainElement = doc.querySelector(".quiz-submission");
+      let result = `<h2 class=display_question quiz-file id="question_${index + 1}">Quiz ${index + 1}</h2>`;
+      if (mainElement) {
+        result += `<div>${mainElement.innerHTML}</div>`;
+      }
+      return result;
+    });
+    return mainContents.join("");
+};
+
+  const handleSumbit = () => {
+    setSendData(true);
+    const mainContents = extractMainContents(htmlContent);
+    console.log("mainContents: ", mainContents);
+    console.log(htmlContent);
+  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
 
   return (
-    <PageWrapper {...getRootProps()}>
-      <input {...getInputProps()} />
-      <UploadWrapper>
-        {isDragActive ? (
-          <p>Drop the files here ...</p>
-        ) : (
-          <p>Drag and drop some files here, or click to select files</p>
-        )}
-      </UploadWrapper>
-      <br></br>
-      <button onClick={()=>setSendData}>Build Study Guide</button>
-      <QuizWrapper>
-        {htmlContent && (
-          <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
-        )}
-      </QuizWrapper>
+    <PageWrapper>
+      {innerHTML ? (
+        <QuizWrapper>
+          {innerHTML && <div dangerouslySetInnerHTML={{ __html: innerHTML }} />}
+        </QuizWrapper>
+      ) : (
+        <>
+          {" "}
+          <div {...getRootProps()}>
+            <input {...getInputProps()} />
+            <UploadWrapper>
+              {isDragActive ? (
+                <p>Drop the files here ...</p>
+              ) : (
+                <p>Drag and drop some files here, or click to select files</p>
+              )}
+            </UploadWrapper>
+          </div>
+          <ButtonWrapper>
+            <button onClick={handleSumbit}>Build Study Guide</button>
+            {fileList &&
+              fileList.map((file) => (
+                <FileWrapper key={file.name}>{file.name}</FileWrapper>
+              ))}
+          </ButtonWrapper>
+        </>
+      )}
     </PageWrapper>
   );
 };
