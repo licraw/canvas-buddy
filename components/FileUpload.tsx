@@ -99,7 +99,7 @@ const FileUploader: React.FC = () => {
       });
       const formData = new FormData();
       formData.append("file", htmlContentBlob);
-      fetch("http://localhost:3001", {
+      fetch("https://canvas-bud.herokuapp.com/", {
         method: "POST",
         body: formData,
       })
