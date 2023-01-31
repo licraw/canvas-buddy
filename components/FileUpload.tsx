@@ -1,10 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import styled from "styled-components";
-
-interface FileUploaderProps {
-  onFileAdded: (file: File) => void;
-}
+import Nav from "./Nav";
 
 const PageWrapper = styled.div`
   display: flex;
@@ -12,6 +9,7 @@ const PageWrapper = styled.div`
   align-items: center;
   justify-content: center;
   padding: 1rem;
+  max-width: 100%;
 `;
 
 const QuizWrapper = styled.div`
@@ -19,8 +17,13 @@ const QuizWrapper = styled.div`
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 600px;
+  width: 350px;
   margin: 0 auto;
+  margin-top: 150px;
+
+  @media (min-width: 768px) {
+    width: 600px;
+  }
 `;
 
 const UploadWrapper = styled.div`
@@ -116,14 +119,16 @@ const FileUploader: React.FC = () => {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, "text/html");
       const mainElement = doc.querySelector(".quiz-submission");
-      let result = `<h2 class=display_question quiz-file id="question_${index + 1}">Quiz ${index + 1}</h2>`;
+      let result = `<h2 class=display_question quiz-file id="question_${
+        index + 1
+      }">Quiz ${index + 1}</h2>`;
       if (mainElement) {
         result += `<div>${mainElement.innerHTML}</div>`;
       }
       return result;
     });
     return mainContents.join("");
-};
+  };
 
   const handleSumbit = () => {
     setSendData(true);
@@ -137,12 +142,18 @@ const FileUploader: React.FC = () => {
   return (
     <PageWrapper>
       {innerHTML ? (
-        <QuizWrapper>
-          {innerHTML && <div dangerouslySetInnerHTML={{ __html: innerHTML }} />}
-        </QuizWrapper>
+        <>
+          <Nav numberOfQuizzes={htmlContent.length}/>
+          <QuizWrapper>
+            {innerHTML && (
+              <div dangerouslySetInnerHTML={{ __html: innerHTML }} />
+            )}
+          </QuizWrapper>
+        </>
       ) : (
         <>
           {" "}
+          <h1>Canvas Study Guide Maker</h1>
           <div {...getRootProps()}>
             <input {...getInputProps()} />
             <UploadWrapper>
