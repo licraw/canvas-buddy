@@ -20,10 +20,23 @@ const QuizWrapper = styled.div`
   width: 350px;
   margin: 0 auto;
   margin-top: 150px;
-
   @media (min-width: 768px) {
     width: 600px;
   }
+`;
+
+const ErrorMessage = styled.div`
+  background-color: #f8d7da;
+  border-color: #f5c6cb;
+  color: #721c24;
+  padding: 12px 20px;
+  border-radius: 4px;
+  margin: 16px 0;
+  font-size: 14px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 `;
 
 const UploadWrapper = styled.div`
@@ -53,43 +66,50 @@ const FileUploader: React.FC = () => {
   const [htmlContent, setHtmlContent] = useState<string[]>([]);
   const [innerHTML, setInnerHTML] = useState<string | null>(null);
   const [sendData, setSendData] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileList, setFileList] = useState<File[]>([]);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
-    if (selectedFile) {
-      setFileList([...fileList, selectedFile]);
+  const processFiles = (files: File[]) => {
+    const validFiles: File[] = [];
+    let hasError = false;
+
+    files.forEach((file) => {
+      if (file.type !== "text/html") {
+        hasError = true;
+        return;
+      }
+
+      // Check file size
+      const maxFileSize = 1e6; // 1 MB
+      if (file.size > maxFileSize) {
+        hasError = true;
+        return;
+      }
+
+      validFiles.push(file);
+    });
+
+    setError(hasError);
+    setFileList([...fileList, ...validFiles]);
+
+    validFiles.forEach((file) => {
       const reader = new FileReader();
       reader.onload = (e: any) => {
-        setHtmlContent([...htmlContent, e.target.result]);
+        setHtmlContent((prevHtmlContent) => [
+          ...prevHtmlContent,
+          e.target.result,
+        ]);
       };
-      reader.readAsText(selectedFile);
-    }
-  }, [selectedFile]);
+      reader.readAsText(file);
+    });
+  };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) {
       return;
     }
 
-    const file = acceptedFiles[0];
-    if (file.type !== "text/html") {
-      alert("Invalid file type. Please select an HTML file.");
-      return;
-    }
-
-    // Check file size
-    const maxFileSize = 1e6; // 1 MB
-    if (file.size > maxFileSize) {
-      alert(
-        `File size too large. Please select a file less than ${
-          maxFileSize / 1e6
-        } MB.`
-      );
-      return;
-    }
-
-    setSelectedFile(file);
+    processFiles(acceptedFiles);
   }, []);
 
   useEffect(() => {
@@ -119,7 +139,7 @@ const FileUploader: React.FC = () => {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, "text/html");
       const mainElement = doc.querySelector(".quiz-submission");
-      let result = `<h2 class=display_question quiz-file id="question_${
+      let result: string = `<h2 class=display_question quiz-file id="question_${
         index + 1
       }">Quiz ${index + 1}</h2>`;
       if (mainElement) {
@@ -143,7 +163,7 @@ const FileUploader: React.FC = () => {
     <PageWrapper>
       {innerHTML ? (
         <>
-          <Nav numberOfQuizzes={htmlContent.length}/>
+          <Nav numberOfQuizzes={htmlContent.length} />
           <QuizWrapper>
             {innerHTML && (
               <div dangerouslySetInnerHTML={{ __html: innerHTML }} />
@@ -164,6 +184,12 @@ const FileUploader: React.FC = () => {
               )}
             </UploadWrapper>
           </div>
+          {error && (
+            <ErrorMessage>
+              Invalid file type or file size too large. Please upload a valid
+              HTML file less than 1 MB.
+            </ErrorMessage>
+          )}
           <ButtonWrapper>
             <button onClick={handleSumbit}>Build Study Guide</button>
             {fileList &&
